@@ -16,6 +16,7 @@
 
 package com.netflix.kayenta.aws.security;
 
+import com.amazonaws.services.cloudwatch.AmazonCloudWatch;
 import com.amazonaws.services.s3.AmazonS3;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.netflix.kayenta.security.AccountCredentials;
@@ -45,4 +46,6 @@ public class AwsNamedAccountCredentials implements AccountCredentials<AwsCredent
   }
 
   @JsonIgnore private AmazonS3 amazonS3;
+
+  @JsonIgnore private AmazonCloudWatch amazonCloudWatch;
 }

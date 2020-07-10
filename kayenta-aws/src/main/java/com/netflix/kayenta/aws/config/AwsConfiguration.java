@@ -24,6 +24,8 @@ import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.auth.BasicSessionCredentials;
 import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.amazonaws.client.builder.AwsClientBuilder;
+import com.amazonaws.services.cloudwatch.AmazonCloudWatch;
+import com.amazonaws.services.cloudwatch.AmazonCloudWatchClientBuilder;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.netflix.kayenta.aws.security.AwsCredentials;
@@ -81,10 +83,16 @@ public class AwsConfiguration {
       }
 
       AmazonS3ClientBuilder amazonS3ClientBuilder = AmazonS3ClientBuilder.standard();
+      AmazonCloudWatchClientBuilder amazonCloudWatchClientBuilder =
+          AmazonCloudWatchClientBuilder.standard();
+
       String profileName = awsManagedAccount.getProfileName();
 
       if (!StringUtils.isEmpty(profileName)) {
-        amazonS3ClientBuilder.withCredentials(new ProfileCredentialsProvider(profileName));
+        ProfileCredentialsProvider profileCredentialsProvider =
+            new ProfileCredentialsProvider(profileName);
+        amazonS3ClientBuilder.withCredentials(profileCredentialsProvider);
+        amazonCloudWatchClientBuilder.withCredentials(profileCredentialsProvider);
       }
 
       AwsManagedAccount.ExplicitAwsCredentials explicitCredentials =
@@ -99,7 +107,10 @@ public class AwsConfiguration {
                     explicitCredentials.getAccessKey(),
                     explicitCredentials.getSecretKey(),
                     sessionToken);
-        amazonS3ClientBuilder.withCredentials(new AWSStaticCredentialsProvider(awsCreds));
+        AWSStaticCredentialsProvider awsStaticCredentialsProvider =
+            new AWSStaticCredentialsProvider(awsCreds);
+        amazonS3ClientBuilder.withCredentials(awsStaticCredentialsProvider);
+        amazonCloudWatchClientBuilder.withCredentials(awsStaticCredentialsProvider);
       }
 
       String endpoint = awsManagedAccount.getEndpoint();
@@ -111,9 +122,12 @@ public class AwsConfiguration {
       } else {
         Optional.ofNullable(awsManagedAccount.getRegion())
             .ifPresent(amazonS3ClientBuilder::setRegion);
+        Optional.ofNullable(awsManagedAccount.getRegion())
+            .ifPresent(amazonCloudWatchClientBuilder::setRegion);
       }
 
       AmazonS3 amazonS3 = amazonS3ClientBuilder.build();
+      AmazonCloudWatch amazonCloudWatch = amazonCloudWatchClientBuilder.build();
 
       try {
         AwsCredentials awsCredentials = new AwsCredentials();
@@ -122,6 +136,11 @@ public class AwsConfiguration {
                 AwsNamedAccountCredentials.builder().name(name).credentials(awsCredentials);
 
         if (!CollectionUtils.isEmpty(supportedTypes)) {
+          if (supportedTypes.contains(AccountCredentials.Type.METRICS_STORE)) {
+            awsNamedAccountCredentialsBuilder.region(awsManagedAccount.getRegion());
+            awsNamedAccountCredentialsBuilder.amazonCloudWatch(amazonCloudWatch);
+          }
+
           if (supportedTypes.contains(AccountCredentials.Type.OBJECT_STORE)) {
             String bucket = awsManagedAccount.getBucket();
             String rootFolder = awsManagedAccount.getRootFolder();
